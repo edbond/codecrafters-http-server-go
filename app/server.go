@@ -9,6 +9,8 @@ import (
 	// Uncomment this block to pass the first stage
 	"net"
 	"os"
+
+	"github.com/containerd/containerd/pkg/cri/io"
 )
 
 type Request struct {
@@ -49,7 +51,7 @@ func main() {
 		req := make([]byte, 255)
 		n, err := conn.Read(req)
 		if err != nil {
-			fmt.Println("error reading request: ", err.Error())
+			fmt.Fprintf(io.Stderr, "error reading request: ", err.Error())
 			os.Exit(1)
 		}
 		fmt.Printf("bytes read: %d\n", n)
