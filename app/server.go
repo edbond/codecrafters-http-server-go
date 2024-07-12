@@ -1,10 +1,13 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/signal"
+	"path"
 	"regexp"
 	"strings"
 )
@@ -16,6 +19,9 @@ type Request struct {
 }
 
 func main() {
+	directory := flag.String("directory", "not-existing", "directory")
+	flag.Parse()
+
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
 
@@ -42,12 +48,12 @@ func main() {
 			os.Exit(1)
 		}
 
-		go handleConnection(conn)
+		go handleConnection(conn, directory)
 
 	}
 }
 
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, directory *string) {
 	fmt.Println("accepted", conn, conn.RemoteAddr())
 
 	req := make([]byte, 50*1024*1024)
@@ -74,14 +80,41 @@ func handleConnection(conn net.Conn) {
 		return
 	}
 
+	if strings.HasPrefix(httpReq.URL, "/files") {
+		filename := strings.TrimPrefix(httpReq.URL, "/files")
+
+		var dirname string = "./not-existing"
+		if directory != nil {
+			dirname = *directory
+		}
+
+		r, err := os.Open(path.Join(dirname, filename))
+		if err != nil {
+			writeResponse(conn, 500, "text/plan", []byte("error opening file"))
+			return
+		}
+
+		defer r.Close()
+
+		body, err := io.ReadAll(r)
+		if err != nil {
+			writeResponse(conn, 500, "text/plan", []byte("error reading file"))
+			return
+		}
+
+		writeResponse(conn, 200, "application/octet-stream", body)
+		return
+	}
+
 	switch httpReq.URL {
 	case "/":
 		// conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-		writeResponse(conn, 200, "text/plain", "")
+		writeResponse(conn, 200, "text/plain", []byte(""))
 	case "/user-agent":
 		userAgent := httpReq.Headers["User-Agent"]
 
-		writeResponse(conn, 200, "text/plain", userAgent)
+		writeResponse(conn, 200, "text/plain", []byte(userAgent))
+
 	default:
 		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
@@ -89,7 +122,7 @@ func handleConnection(conn net.Conn) {
 	conn.Close()
 }
 
-func writeResponse(conn net.Conn, status int, contentType, body string) {
+func writeResponse(conn net.Conn, status int, contentType string, body []byte) {
 	var statusDescription string
 	switch status {
 	case 200:
