@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os/signal"
 	"regexp"
 	"strings"
 
@@ -28,44 +29,54 @@ func main() {
 		os.Exit(1)
 	}
 
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
+	intChan := make(chan os.Signal, 1)
+	signal.Notify(intChan, os.Interrupt)
+
+	go func() {
+		<-intChan
 		os.Exit(1)
-	}
+	}()
 
-	req := make([]byte, 256)
-	n, err := conn.Read(req)
-	if err != nil {
-		fmt.Println("error reading request: ", err.Error())
-		os.Exit(1)
-	}
-	fmt.Printf("bytes read: %d\n", n)
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
 
-	httpReq, err := parseRequest(req[:n])
-	if err != nil {
-		fmt.Println("error parsing request: ", err.Error())
-		os.Exit(2)
-	}
+		req := make([]byte, 256)
+		n, err := conn.Read(req)
+		if err != nil {
+			fmt.Println("error reading request: ", err.Error())
+			os.Exit(1)
+		}
+		fmt.Printf("bytes read: %d\n", n)
 
-	fmt.Printf("request: %+v\n", httpReq)
+		httpReq, err := parseRequest(req[:n])
+		if err != nil {
+			fmt.Println("error parsing request: ", err.Error())
+			os.Exit(2)
+		}
 
-	if strings.HasPrefix(httpReq.URL, "/echo") {
-		abc := strings.TrimPrefix(httpReq.URL, "/echo/")
+		fmt.Printf("request: %+v\n", httpReq)
 
-		writeResponse(conn, 200, "text/plain", abc)
-		return
-	}
+		if strings.HasPrefix(httpReq.URL, "/echo") {
+			abc := strings.TrimPrefix(httpReq.URL, "/echo/")
 
-	switch httpReq.URL {
-	case "/":
-		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-	case "/user-agent":
-		userAgent := httpReq.Headers["User-Agent"]
+			writeResponse(conn, 200, "text/plain", abc)
+			return
+		}
 
-		writeResponse(conn, 200, "text/plain", userAgent)
-	default:
-		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+		switch httpReq.URL {
+		case "/":
+			conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+		case "/user-agent":
+			userAgent := httpReq.Headers["User-Agent"]
+
+			writeResponse(conn, 200, "text/plain", userAgent)
+		default:
+			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+		}
 	}
 
 }
