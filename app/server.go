@@ -43,7 +43,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		fmt.Println("accepted", conn)
+		fmt.Println("accepted", conn, conn.RemoteAddr())
 
 		req := make([]byte, 256)
 		n, err := conn.Read(req)
