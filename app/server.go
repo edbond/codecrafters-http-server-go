@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os/signal"
 	"regexp"
 	"strings"
 
@@ -29,13 +28,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	intChan := make(chan os.Signal, 1)
-	signal.Notify(intChan, os.Interrupt)
+	// intChan := make(chan os.Signal, 1)
+	// signal.Notify(intChan, os.Interrupt)
 
-	go func() {
-		<-intChan
-		os.Exit(1)
-	}()
+	// go func() {
+	// 	<-intChan
+	// 	os.Exit(1)
+	// }()
 
 	for {
 		conn, err := l.Accept()
