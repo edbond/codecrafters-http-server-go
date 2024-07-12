@@ -36,51 +36,51 @@ func main() {
 	// 	os.Exit(1)
 	// }()
 
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			fmt.Println("Error accepting connection: ", err.Error())
-			os.Exit(1)
-		}
-
-		fmt.Println("accepted", conn, conn.RemoteAddr())
-
-		req := make([]byte, 32)
-		n, err := conn.Read(req)
-		if err != nil {
-			fmt.Println("error reading request: ", err.Error())
-			os.Exit(1)
-		}
-		fmt.Printf("bytes read: %d\n", n)
-
-		httpReq, err := parseRequest(req[:n])
-		if err != nil {
-			fmt.Println("error parsing request: ", err.Error())
-			os.Exit(2)
-		}
-
-		fmt.Printf("request: %+v\n", httpReq)
-
-		if strings.HasPrefix(httpReq.URL, "/echo") {
-			abc := strings.TrimPrefix(httpReq.URL, "/echo/")
-
-			writeResponse(conn, 200, "text/plain", abc)
-			return
-		}
-
-		switch httpReq.URL {
-		case "/":
-			conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-		case "/user-agent":
-			userAgent := httpReq.Headers["User-Agent"]
-
-			writeResponse(conn, 200, "text/plain", userAgent)
-		default:
-			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-		}
-
-		conn.Close()
+	// for {
+	conn, err := l.Accept()
+	if err != nil {
+		fmt.Println("Error accepting connection: ", err.Error())
+		os.Exit(1)
 	}
+
+	fmt.Println("accepted", conn, conn.RemoteAddr())
+
+	req := make([]byte, 255)
+	n, err := conn.Read(req)
+	if err != nil {
+		fmt.Println("error reading request: ", err.Error())
+		os.Exit(1)
+	}
+	fmt.Printf("bytes read: %d\n", n)
+
+	httpReq, err := parseRequest(req[:n])
+	if err != nil {
+		fmt.Println("error parsing request: ", err.Error())
+		os.Exit(2)
+	}
+
+	fmt.Printf("request: %+v\n", httpReq)
+
+	if strings.HasPrefix(httpReq.URL, "/echo") {
+		abc := strings.TrimPrefix(httpReq.URL, "/echo/")
+
+		writeResponse(conn, 200, "text/plain", abc)
+		return
+	}
+
+	switch httpReq.URL {
+	case "/":
+		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	case "/user-agent":
+		userAgent := httpReq.Headers["User-Agent"]
+
+		writeResponse(conn, 200, "text/plain", userAgent)
+	default:
+		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+	}
+
+	conn.Close()
+	// }
 
 }
 
