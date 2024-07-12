@@ -11,8 +11,9 @@ import (
 )
 
 type Request struct {
-	URL    string
-	Method string
+	URL     string
+	Method  string
+	Headers map[string]string
 }
 
 func main() {
@@ -51,40 +52,68 @@ func main() {
 
 	if strings.HasPrefix(httpReq.URL, "/echo") {
 		abc := strings.TrimPrefix(httpReq.URL, "/echo/")
-		contentLength := len(abc)
 
-		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", contentLength, abc)))
+		writeResponse(conn, 200, "text/plain", abc)
 		return
 	}
 
 	switch httpReq.URL {
 	case "/":
 		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	case "/user-agent":
+		userAgent := httpReq.Headers["User-Agent"]
+
+		writeResponse(conn, 200, "text/plain", userAgent)
 	default:
 		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
 
 }
 
+func writeResponse(conn net.Conn, status int, contentType, body string) {
+	var statusDescription string
+	switch status {
+	case 200:
+		statusDescription = "OK"
+	case 404:
+		statusDescription = "Not Found"
+	}
+
+	contentLength := len(body)
+
+	response := fmt.Sprintf("HTTP/1.1 %d %s\r\n\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s", status, statusDescription, contentType, contentLength, body)
+
+	conn.Write([]byte(response))
+}
+
 var (
 	methodUrlRe = regexp.MustCompile(`^(GET|POST|PUT) (.+?) HTTP/(\d\.?\d)$`)
+
+	headerRe = regexp.MustCompile(`^([A-Za-z-]): (.+)$`)
 )
 
 func parseRequest(req []byte) (Request, error) {
 	r := Request{}
+	r.Headers = make(map[string]string)
 
 	lines := strings.Split(string(req), "\r\n")
 
 	fmt.Printf("lines: %#v\n", lines)
 
-	for _, l := range lines {
-		matches := methodUrlRe.FindStringSubmatch(l)
+	for _, line := range lines {
+		matches := methodUrlRe.FindStringSubmatch(line)
 
 		fmt.Printf("matches: %#v\n", matches)
 		if len(matches) >= 2 {
 			// 0 = full match
 			r.Method = matches[1]
 			r.URL = matches[2]
+			continue
+		}
+
+		headerMatches := headerRe.FindStringSubmatch(line)
+		if len(headerMatches) > 1 {
+			r.Headers[headerMatches[1]] = headerMatches[2]
 		}
 	}
 
