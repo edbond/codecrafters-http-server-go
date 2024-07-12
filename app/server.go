@@ -81,7 +81,7 @@ func writeResponse(conn net.Conn, status int, contentType, body string) {
 
 	contentLength := len(body)
 
-	response := fmt.Sprintf("HTTP/1.1 %d %s\r\n\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s", status, statusDescription, contentType, contentLength, body)
+	response := fmt.Sprintf("HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s", status, statusDescription, contentType, contentLength, body)
 
 	conn.Write([]byte(response))
 }
