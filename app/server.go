@@ -49,6 +49,13 @@ func main() {
 
 	fmt.Printf("request: %+v\n", httpReq)
 
+	if strings.HasPrefix(httpReq.URL, "/echo") {
+		abc := strings.TrimPrefix(httpReq.URL, "/echo/")
+
+		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\n%s", abc)))
+		return
+	}
+
 	switch httpReq.URL {
 	case "/":
 		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
