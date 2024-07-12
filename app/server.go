@@ -16,6 +16,7 @@ type Request struct {
 	URL     string
 	Method  string
 	Headers map[string]string
+	Body    []byte
 }
 
 func main() {
@@ -81,28 +82,11 @@ func handleConnection(conn net.Conn, directory *string) {
 	}
 
 	if strings.HasPrefix(httpReq.URL, "/files") {
-		filename := strings.TrimPrefix(httpReq.URL, "/files")
-
-		var dirname string = "./not-existing"
-		if directory != nil {
-			dirname = *directory
+		if httpReq.Method == "GET" {
+			serveFile(conn, directory, httpReq)
+		} else {
+			writeFile(conn, directory, httpReq)
 		}
-
-		r, err := os.Open(path.Join(dirname, filename))
-		if err != nil {
-			writeResponse(conn, 404, "text/plan", []byte("error opening file"))
-			return
-		}
-
-		defer r.Close()
-
-		body, err := io.ReadAll(r)
-		if err != nil {
-			writeResponse(conn, 500, "text/plan", []byte("error reading file"))
-			return
-		}
-
-		writeResponse(conn, 200, "application/octet-stream", body)
 		return
 	}
 
@@ -122,18 +106,70 @@ func handleConnection(conn net.Conn, directory *string) {
 	conn.Close()
 }
 
-func writeResponse(conn net.Conn, status int, contentType string, body []byte) {
-	var statusDescription string
-	switch status {
-	case 200:
-		statusDescription = "OK"
-	case 404:
-		statusDescription = "Not Found"
+func writeFile(conn net.Conn, directory *string, httpReq Request) {
+	filename := strings.TrimPrefix(httpReq.URL, "/files")
+
+	var dirname string = "./not-existing"
+	if directory != nil {
+		dirname = *directory
 	}
 
+	w, err := os.Create(path.Join(dirname, filename))
+	if err != nil {
+		writeResponse(conn, 404, "text/plan", []byte("error opening file for writing"))
+		return
+	}
+
+	defer w.Close()
+
+	w.Write([]byte(httpReq.Body))
+
+	writeResponse(conn, 201, "text/plan", []byte(""))
+}
+
+func serveFile(conn net.Conn, directory *string, httpReq Request) {
+	filename := strings.TrimPrefix(httpReq.URL, "/files")
+
+	var dirname string = "./not-existing"
+	if directory != nil {
+		dirname = *directory
+	}
+
+	r, err := os.Open(path.Join(dirname, filename))
+	if err != nil {
+		writeResponse(conn, 404, "text/plan", []byte("error opening file"))
+		return
+	}
+
+	defer r.Close()
+
+	body, err := io.ReadAll(r)
+	if err != nil {
+		writeResponse(conn, 500, "text/plan", []byte("error reading file"))
+		return
+	}
+
+	writeResponse(conn, 200, "application/octet-stream", body)
+}
+
+var (
+	statusText = map[int]string{
+		200: "OK",
+		201: "Created",
+		404: "Not Found",
+		500: "Server Error",
+	}
+)
+
+func writeResponse(conn net.Conn, status int, contentType string, body []byte) {
 	contentLength := len(body)
 
-	response := fmt.Sprintf("HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s", status, statusDescription, contentType, contentLength, body)
+	response := fmt.Sprintf("HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s",
+		status,
+		statusText[status],
+		contentType,
+		contentLength,
+		body)
 
 	conn.Write([]byte(response))
 }
@@ -152,21 +188,34 @@ func parseRequest(req []byte) (Request, error) {
 
 	fmt.Printf("lines: %#v\n", lines)
 
-	for _, line := range lines {
-		matches := methodUrlRe.FindStringSubmatch(line)
+	stage := "INITIAL"
 
-		fmt.Printf("matches: %#v\n", matches)
-		if len(matches) >= 2 {
-			// 0 = full match
-			r.Method = matches[1]
-			r.URL = matches[2]
-			continue
+	for _, line := range lines {
+		if line == "\r\n" && stage == "HEADERS" {
+			stage = "BODY"
 		}
 
-		headerMatches := headerRe.FindStringSubmatch(line)
-		fmt.Printf("headers matches: %#v\n", headerMatches)
-		if len(headerMatches) > 1 {
-			r.Headers[headerMatches[1]] = headerMatches[2]
+		switch stage {
+		case "INITIAL":
+			matches := methodUrlRe.FindStringSubmatch(line)
+			fmt.Printf("matches: %#v\n", matches)
+			if len(matches) >= 2 {
+				// 0 = full match
+				r.Method = matches[1]
+				r.URL = matches[2]
+
+				stage = "HEADERS"
+				continue
+			}
+		case "HEADERS":
+			headerMatches := headerRe.FindStringSubmatch(line)
+			fmt.Printf("headers matches: %#v\n", headerMatches)
+			if len(headerMatches) > 1 {
+				r.Headers[headerMatches[1]] = headerMatches[2]
+			}
+
+		case "BODY":
+			r.Body = append(r.Body, []byte(line)...)
 		}
 	}
 
