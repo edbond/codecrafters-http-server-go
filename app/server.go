@@ -51,8 +51,9 @@ func main() {
 
 	if strings.HasPrefix(httpReq.URL, "/echo") {
 		abc := strings.TrimPrefix(httpReq.URL, "/echo/")
+		contentLength := len(abc)
 
-		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\n%s", abc)))
+		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", contentLength, abc)))
 		return
 	}
 
