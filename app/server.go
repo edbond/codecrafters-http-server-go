@@ -70,7 +70,8 @@ func main() {
 
 		switch httpReq.URL {
 		case "/":
-			conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n\r\n"))
+			// conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+			writeResponse(conn, 200, "text/plain", "")
 		case "/user-agent":
 			userAgent := httpReq.Headers["User-Agent"]
 
