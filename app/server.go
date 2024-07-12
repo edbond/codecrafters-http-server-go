@@ -44,9 +44,7 @@ func main() {
 
 		fmt.Println("accepted", conn, conn.RemoteAddr())
 
-		req := make([]byte, 1)
-
-		fmt.Println("reading")
+		req := make([]byte, 50*1024*1024)
 
 		n, err := conn.Read(req)
 		if err != nil {
