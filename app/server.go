@@ -122,6 +122,8 @@ func writeFile(conn net.Conn, directory *string, httpReq Request) {
 
 	defer w.Close()
 
+	fmt.Println("writing to file", dirname, filename, "content", httpReq.Body)
+
 	w.Write([]byte(httpReq.Body))
 
 	writeResponse(conn, 201, "text/plan", []byte(""))
@@ -191,7 +193,7 @@ func parseRequest(req []byte) (Request, error) {
 	stage := "INITIAL"
 
 	for _, line := range lines {
-		if line == "\r\n" && stage == "HEADERS" {
+		if line == "" && stage == "HEADERS" {
 			stage = "BODY"
 		}
 
