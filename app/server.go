@@ -89,7 +89,7 @@ func writeResponse(conn net.Conn, status int, contentType, body string) {
 var (
 	methodUrlRe = regexp.MustCompile(`^(GET|POST|PUT) (.+?) HTTP/(\d\.?\d)$`)
 
-	headerRe = regexp.MustCompile(`^([A-Za-z-]): (.+)$`)
+	headerRe = regexp.MustCompile(`^([A-Za-z-]+): (.+)$`)
 )
 
 func parseRequest(req []byte) (Request, error) {
@@ -112,6 +112,7 @@ func parseRequest(req []byte) (Request, error) {
 		}
 
 		headerMatches := headerRe.FindStringSubmatch(line)
+		fmt.Printf("headers matches: %#v\n", headerMatches)
 		if len(headerMatches) > 1 {
 			r.Headers[headerMatches[1]] = headerMatches[2]
 		}
