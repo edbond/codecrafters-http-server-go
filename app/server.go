@@ -76,7 +76,7 @@ func handleConnection(conn net.Conn, directory *string) {
 	if strings.HasPrefix(httpReq.URL, "/echo") {
 		abc := strings.TrimPrefix(httpReq.URL, "/echo/")
 
-		writeResponse(conn, 200, "text/plain", abc)
+		writeResponse(conn, 200, "text/plain", []byte(abc))
 		return
 	}
 
