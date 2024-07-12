@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"regexp"
 	"strings"
+	"time"
 )
 
 type Request struct {
@@ -43,6 +44,8 @@ func main() {
 		}
 
 		fmt.Println("accepted", conn, conn.RemoteAddr())
+
+		conn.SetReadDeadline(time.Now().Add(15 * time.Second))
 
 		req := make([]byte, 255)
 		n, err := conn.Read(req)
