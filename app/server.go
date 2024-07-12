@@ -90,7 +90,7 @@ func handleConnection(conn net.Conn, directory *string) {
 
 		r, err := os.Open(path.Join(dirname, filename))
 		if err != nil {
-			writeResponse(conn, 500, "text/plan", []byte("error opening file"))
+			writeResponse(conn, 404, "text/plan", []byte("error opening file"))
 			return
 		}
 
