@@ -1,3 +1,7 @@
+# HTTP Server in Go exercise
+
+HTTP server example
+
 [![progress-banner](https://backend.codecrafters.io/progress/http-server/79df86dc-406e-4a06-acec-3beb732db36a)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
 
 This is a starting point for Go solutions to the
