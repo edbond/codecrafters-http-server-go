@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"flag"
 	"fmt"
 	"io"
@@ -12,11 +14,20 @@ import (
 	"strings"
 )
 
+type Encoding string
+
+const (
+	EncodingGzip    = "gzip"
+	EncodingPlain   = "plain"
+	EncodingInvalid = "invalid"
+)
+
 type Request struct {
-	URL     string
-	Method  string
-	Headers map[string]string
-	Body    []byte
+	URL      string
+	Method   string
+	Headers  map[string]string
+	Body     []byte
+	Encoding Encoding
 }
 
 func main() {
@@ -74,10 +85,21 @@ func handleConnection(conn net.Conn, directory *string) {
 
 	fmt.Printf("request: %+v\n", httpReq)
 
+	httpReq.Encoding = EncodingPlain
+
+	encoding, found := httpReq.Headers["Accept-Encoding"]
+	if found {
+		if encoding == "gzip" {
+			httpReq.Encoding = EncodingGzip
+		} else {
+			httpReq.Encoding = EncodingInvalid
+		}
+	}
+
 	if strings.HasPrefix(httpReq.URL, "/echo") {
 		abc := strings.TrimPrefix(httpReq.URL, "/echo/")
 
-		writeResponse(conn, 200, "text/plain", []byte(abc))
+		writeResponse(conn, 200, "text/plain", []byte(abc), httpReq)
 		return
 	}
 
@@ -93,14 +115,14 @@ func handleConnection(conn net.Conn, directory *string) {
 	switch httpReq.URL {
 	case "/":
 		// conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-		writeResponse(conn, 200, "text/plain", []byte(""))
+		writeResponse(conn, 200, "text/plain", []byte(""), httpReq)
 	case "/user-agent":
 		userAgent := httpReq.Headers["User-Agent"]
 
-		writeResponse(conn, 200, "text/plain", []byte(userAgent))
-
+		writeResponse(conn, 200, "text/plain", []byte(userAgent), httpReq)
 	default:
-		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+		writeResponse(conn, 404, "text/plain", []byte(""), httpReq)
+		// conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
 
 	conn.Close()
@@ -116,7 +138,7 @@ func writeFile(conn net.Conn, directory *string, httpReq Request) {
 
 	w, err := os.Create(path.Join(dirname, filename))
 	if err != nil {
-		writeResponse(conn, 404, "text/plan", []byte("error opening file for writing"))
+		writeResponse(conn, 404, "text/plan", []byte("error opening file for writing"), httpReq)
 		return
 	}
 
@@ -126,7 +148,7 @@ func writeFile(conn net.Conn, directory *string, httpReq Request) {
 
 	w.Write([]byte(httpReq.Body))
 
-	writeResponse(conn, 201, "text/plan", []byte(""))
+	writeResponse(conn, 201, "text/plan", []byte(""), httpReq)
 }
 
 func serveFile(conn net.Conn, directory *string, httpReq Request) {
@@ -139,7 +161,7 @@ func serveFile(conn net.Conn, directory *string, httpReq Request) {
 
 	r, err := os.Open(path.Join(dirname, filename))
 	if err != nil {
-		writeResponse(conn, 404, "text/plan", []byte("error opening file"))
+		writeResponse(conn, 404, "text/plan", []byte("error opening file"), httpReq)
 		return
 	}
 
@@ -147,11 +169,11 @@ func serveFile(conn net.Conn, directory *string, httpReq Request) {
 
 	body, err := io.ReadAll(r)
 	if err != nil {
-		writeResponse(conn, 500, "text/plan", []byte("error reading file"))
+		writeResponse(conn, 500, "text/plan", []byte("error reading file"), httpReq)
 		return
 	}
 
-	writeResponse(conn, 200, "application/octet-stream", body)
+	writeResponse(conn, 200, "application/octet-stream", body, httpReq)
 }
 
 var (
@@ -163,13 +185,51 @@ var (
 	}
 )
 
-func writeResponse(conn net.Conn, status int, contentType string, body []byte) {
+func gzipBody(body []byte) ([]byte, error) {
+	var gzipBuf bytes.Buffer
+
+	gw := gzip.NewWriter(&gzipBuf)
+	gw.Write(body)
+	err := gw.Flush()
+	if err != nil {
+		return nil, err
+	}
+
+	err = gw.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	return gzipBuf.Bytes(), nil
+
+}
+
+func writeResponse(conn net.Conn, status int, contentType string, body []byte, req Request) {
+	var err error
+	var contentEncodingHeader string
+
+	if req.Encoding == EncodingGzip {
+		// gzip body
+		body, err = gzipBody(body)
+		if err != nil {
+			msg := err.Error()
+
+			resp := fmt.Sprintf("HTTP/1.1 500 Server Error\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(msg), msg)
+
+			conn.Write([]byte(resp))
+			return
+		}
+
+		contentEncodingHeader = "Content-Encoding: gzip\r\n"
+	}
+
 	contentLength := len(body)
 
-	response := fmt.Sprintf("HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s",
+	response := fmt.Sprintf("HTTP/1.1 %d %s\r\nContent-Type: %s\r\n%sContent-Length: %d\r\n\r\n%s",
 		status,
 		statusText[status],
 		contentType,
+		contentEncodingHeader,
 		contentLength,
 		body)
 
@@ -178,8 +238,7 @@ func writeResponse(conn net.Conn, status int, contentType string, body []byte) {
 
 var (
 	methodUrlRe = regexp.MustCompile(`^(GET|POST|PUT) (.+?) HTTP/(\d\.?\d)$`)
-
-	headerRe = regexp.MustCompile(`^([A-Za-z-]+): (.+)$`)
+	headerRe    = regexp.MustCompile(`^([A-Za-z-]+): (.+)$`)
 )
 
 func parseRequest(req []byte) (Request, error) {
