@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -89,7 +90,12 @@ func handleConnection(conn net.Conn, directory *string) {
 
 	encoding, found := httpReq.Headers["Accept-Encoding"]
 	if found {
-		if encoding == "gzip" {
+		encodings := strings.Split(encoding, ",")
+		gzip := slices.ContainsFunc(encodings, func(enc string) bool {
+			return strings.TrimSpace(enc) == "gzip"
+		})
+
+		if gzip {
 			httpReq.Encoding = EncodingGzip
 		} else {
 			httpReq.Encoding = EncodingInvalid
