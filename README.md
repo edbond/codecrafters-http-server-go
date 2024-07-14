@@ -4,7 +4,7 @@ HTTP server example
 
 [![progress-banner](https://backend.codecrafters.io/progress/http-server/79df86dc-406e-4a06-acec-3beb732db36a)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
 
-This is a starting point for Go solutions to the
+This is a Go solutions to the
 ["Build Your Own HTTP server" Challenge](https://app.codecrafters.io/courses/http-server/overview).
 
 [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol) is the
